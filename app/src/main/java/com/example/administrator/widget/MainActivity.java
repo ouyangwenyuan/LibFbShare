@@ -1,27 +1,31 @@
 package com.example.administrator.widget;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Toast;
 
 import com.beta.fbinvite.invite.FBFriendsModel;
 import com.beta.fbinvite.invite.FBUtils;
 import com.beta.fbinvite.invite.FbRequest;
+import com.beta.fbinvite.invite.MyLog;
 import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
-import com.facebook.FacebookSdk;
-import com.facebook.appevents.AppEventsLogger;
-import com.facebook.login.LoginBehavior;
 import com.facebook.login.widget.LoginButton;
 
-import java.math.BigDecimal;
-import java.util.Currency;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -55,7 +59,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private CallbackManager fbcallbackMgr = CallbackManager.Factory.create();
 
     public FBUtils mFbUtils;
-    List<FBFriendsModel.PayloadBean> model = null;
+    private List<FBFriendsModel.PayloadBean> model = null;
+
+    private Handler handler = new Handler();
+    private Map<FBFriendsModel.PayloadBean, Boolean> selectFriends = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +80,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         findViewById(R.id.bt_friendlist).setOnClickListener(this);
         findViewById(R.id.bt_invited).setOnClickListener(this);
         findViewById(R.id.bt_shared).setOnClickListener(this);
+        findViewById(R.id.bt_select_friend).setOnClickListener(this);
 
 //        String app_id = getResources().getString(R.string.facebook_app_id);
         mFbUtils = new FBUtils(getString(R.string.facebook_app_id));
@@ -91,7 +99,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             break;
             case R.id.bt_friendlist: {
                 AccessToken accessToken = AccessToken.getCurrentAccessToken();
-                Log.i("friendlist", "accessToken=" + accessToken);
+                MyLog.i("accessToken=" + accessToken);
                 if (accessToken != null) {
 //                    mFbUtils.getList();
                     mFbUtils.fetchFriends(new FbRequest.FbFetchFriendCallback() {
@@ -99,12 +107,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         public void onFinish(List<FBFriendsModel.PayloadBean> model1) {
                             model = model1;
 
-                            int size = model.size();
-                            String ids = "";
-                            for (int i = 0; i < size; i++) {
-                                ids += model.get(i).getUid() + ",";
-                            }
-                            Log.i("friendlist", "friendlist=" + ids);
                         }
 
                         @Override
@@ -114,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                         @Override
                         public void onFetchItem(FBFriendsModel.PayloadBean modelPayload) {
-                            Log.i("friendlist", "modelPayload=" + modelPayload.getText() + ",uid=" + modelPayload.getUid());
+                            MyLog.i("modelPayload=" + modelPayload.getText() + ",uid=" + modelPayload.getUid());
                         }
                     });
                 } else {
@@ -126,9 +128,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 if (model != null) {
                     int size = model.size();
-                    String ids = "";
+                    StringBuilder ids = new StringBuilder();
                     for (int i = 0; i < size; i++) {
-                        ids += model.get(i).getUid() + ",";
+                        ids.append(model.get(i).getUid());
+                        ids.append(",");
                         if (((i + 1) % 50 == 0 || i == size - 1)) {
 //                            int index = 0;
 //                            if (i > 49) {
@@ -139,19 +142,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //                            if (TextUtils.isEmpty(display)) {
 //                                display = payloadBean.getText();
 //                            }
-                            String substring = ids.substring(0, ids.length() - 1);
-                            mFbUtils.sendInvites(substring, new FbRequest.FbInviteCallback() {
-                                @Override
-                                public void onSuccess(String keys) {
-                                    Log.i("friendlist", "发送邀请成功 ,uid=" + keys);
-                                }
-
-                                @Override
-                                public void onFail(String error) {
-                                    Log.i("friendlist", "error=" + error);
-                                }
-                            });
-                            ids = "";
+                            sendInvite(ids);
+                            ids.delete(0, ids.length());
                         }
                     }
                 } else {
@@ -165,9 +157,72 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 mFbUtils.shareApp(this, url, fbcallbackMgr, new MyFackbookCallback(share_type));
             }
+            case R.id.bt_select_friend: {
+                if (model != null) {
+                    int size = model.size();
+                    StringBuilder ids = new StringBuilder();
+                    final CharSequence[] items = new CharSequence[size];
+                    for (int i = 0; i < size; i++) {
+//                        ids += model.get(i).getUid() + ",";
+                        ids.append(model.get(i).getUid());
+                        ids.append(",");
+                        items[i] = model.get(i).getText();
+                    }
+                    MyLog.i("friendlist=" + ids);
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            final AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                            builder.setMultiChoiceItems(items, null, new DialogInterface.OnMultiChoiceClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which, boolean isChecked) {
+                                    selectFriends.put(model.get(which), isChecked);
+                                }
+                            }).setPositiveButton("ok", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    Set<FBFriendsModel.PayloadBean> sequenceSet = selectFriends.keySet();
+                                    StringBuilder ids = new StringBuilder();
+                                    for (FBFriendsModel.PayloadBean key : sequenceSet) {
+                                        ids.append(key.getUid());
+                                        ids.append(",");
+                                    }
+                                    sendInvite(ids);
+                                    MyLog.i("friendlist=" + ids);
+                                }
+                            }).setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+
+                                }
+                            });
+                            AlertDialog dialog = builder.create();
+                            dialog.show();
+                        }
+                    });
+                } else {
+                    Toast.makeText(getApplicationContext(), "facebook好友列表为空，请重新获取好友", Toast.LENGTH_SHORT).show();
+                }
+            }
             break;
 
         }
+    }
+
+    private void sendInvite(StringBuilder ids) {
+        String substring = ids.substring(0, ids.length() - 1);
+        mFbUtils.sendInvites(substring, new FbRequest.FbInviteCallback() {
+            @Override
+            public void onSuccess(String keys) {
+                MyLog.i("发送邀请成功 ,uid=" + keys);
+            }
+
+            @Override
+            public void onFail(String error) {
+                MyLog.i("error=" + error);
+            }
+        });
     }
 
 
@@ -175,5 +230,37 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         fbcallbackMgr.onActivityResult(requestCode, resultCode, data);
+    }
+
+    private class FriendsAdapter extends BaseAdapter {
+        List<FBFriendsModel.PayloadBean> model1;
+
+        public FriendsAdapter(List<FBFriendsModel.PayloadBean> model1) {
+            this.model1 = model1;
+        }
+
+        public void setModel1(List<FBFriendsModel.PayloadBean> model1) {
+            this.model1 = model1;
+        }
+
+        @Override
+        public int getCount() {
+            return model1 == null ? 0 : model1.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return model1.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            return null;
+        }
     }
 }

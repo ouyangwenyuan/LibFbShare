@@ -26,13 +26,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import rx.Observable;
-import rx.Subscription;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Action1;
-import rx.functions.Func1;
-import rx.schedulers.Schedulers;
-import rx.subscriptions.CompositeSubscription;
 
 /**
  * Created by hedong on 2017/7/5.
@@ -87,7 +80,7 @@ public class FBUtils implements FbRequest {
     public static final String REQUEST_PARAMS_REDIRECT_TO = "to";
     public static final String SIZE = "picture.width(%d).height(%d)";
 
-    private CompositeSubscription mSubscriptions;
+//    private CompositeSubscription mSubscriptions;
     private Context context;
     private String app_id;
 
@@ -160,7 +153,7 @@ public class FBUtils implements FbRequest {
 
                                 callback.onFinish(modelPayload);
 
-                                getUserDetail(modelPayload, callback);
+//                                getUserDetail(modelPayload, callback);
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -178,41 +171,41 @@ public class FBUtils implements FbRequest {
         });
     }
 
-    private void getUserDetail(final List<FBFriendsModel.PayloadBean> modelPayload, final FbFetchFriendCallback callback) {
-        addSubscription(Observable.from(modelPayload)
-                .concatMap(new Func1<FBFriendsModel.PayloadBean, Observable<UrlModel>>() {
-                    @Override
-                    public Observable<UrlModel> call(FBFriendsModel.PayloadBean payloadBean) {
-                        LoginAPIService server = RetrofitManager.getInstance(REQUEST_BIG_IMAGE).create(LoginAPIService.class);
-                        return server.getUrl(payloadBean.getUid() + "", String.format(SIZE, 148, 148));
-                    }
-                }).subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Action1<UrlModel>() {
-                    @Override
-                    public void call(UrlModel urlModel) {
-                        for (FBFriendsModel.PayloadBean item : modelPayload) {
-                            if ((item.getUid() + "").equals(urlModel.getId())) {
-                                String path = urlModel.getPicture().getData().getUrl();
-                                item.setPhoto(path);
-                                callback.onFetchItem(item);
-                            }
-                        }
-                    }
-                }, new Action1<Throwable>() {
-                    @Override
-                    public void call(Throwable throwable) {
-
-                    }
-                }));
-    }
-
-    private void addSubscription(Subscription subscription) {
-        if (mSubscriptions == null) {
-            mSubscriptions = new CompositeSubscription();
-        }
-        mSubscriptions.add(subscription);
-    }
+//    private void getUserDetail(final List<FBFriendsModel.PayloadBean> modelPayload, final FbFetchFriendCallback callback) {
+//        addSubscription(Observable.from(modelPayload)
+//                .concatMap(new Func1<FBFriendsModel.PayloadBean, Observable<UrlModel>>() {
+//                    @Override
+//                    public Observable<UrlModel> call(FBFriendsModel.PayloadBean payloadBean) {
+//                        LoginAPIService server = RetrofitManager.getInstance(REQUEST_BIG_IMAGE).create(LoginAPIService.class);
+//                        return server.getUrl(payloadBean.getUid() + "", String.format(SIZE, 148, 148));
+//                    }
+//                }).subscribeOn(Schedulers.io())
+//                .observeOn(AndroidSchedulers.mainThread())
+//                .subscribe(new Action1<UrlModel>() {
+//                    @Override
+//                    public void call(UrlModel urlModel) {
+//                        for (FBFriendsModel.PayloadBean item : modelPayload) {
+//                            if ((item.getUid() + "").equals(urlModel.getId())) {
+//                                String path = urlModel.getPicture().getData().getUrl();
+//                                item.setPhoto(path);
+//                                callback.onFetchItem(item);
+//                            }
+//                        }
+//                    }
+//                }, new Action1<Throwable>() {
+//                    @Override
+//                    public void call(Throwable throwable) {
+//
+//                    }
+//                }));
+//    }
+//
+//    private void addSubscription(Subscription subscription) {
+//        if (mSubscriptions == null) {
+//            mSubscriptions = new CompositeSubscription();
+//        }
+//        mSubscriptions.add(subscription);
+//    }
 
     /**
      *
