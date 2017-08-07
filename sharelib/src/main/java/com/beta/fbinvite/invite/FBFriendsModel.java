@@ -71,7 +71,7 @@ public class FBFriendsModel implements Serializable {
     }
 
     public static class PayloadBean implements Serializable {
-
+        public boolean isSelect;
         private int status;
         private String path;
         private String photo;
